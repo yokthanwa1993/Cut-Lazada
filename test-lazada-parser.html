@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lazada URL Parser - ตัดคำ URL Lazada</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #ff6f61;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #ff6f61;
+        }
+        button {
+            background-color: #ff6f61;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #e55a4f;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #ff6f61;
+        }
+        .result h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .product-id {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff6f61;
+            background-color: #fff3f2;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .new-url {
+            font-family: monospace;
+            background-color: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 4px;
+            word-break: break-all;
+            margin: 5px 0;
+        }
+        
+        .new-url a {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .new-url a:hover {
+            text-decoration: underline !important;
+            opacity: 0.8;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Lazada URL Shortener</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">
+            ตัดคำและย่อลิงก์ URL ของ Lazada
+        </p>
+        
+        <div class="input-group">
+            <label for="lazadaUrl">URL ของ Lazada:</label>
+            <input type="text" id="lazadaUrl" placeholder="วาง URL ของ Lazada ที่นี่..." />
+        </div>
+        
+        <div style="text-align: center;">
+            <button onclick="shortenUrl()">🔗 ย่อลิงก์</button>
+            <button onclick="clearResults()">🗑️ ล้างผลลัพธ์</button>
+        </div>
+        
+        <div id="result" class="result" style="display: none;">
+            <h3>ผลลัพธ์:</h3>
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ฟังก์ชันสำหรับตัดคำ URL ของ Lazada เพื่อดึงรหัสสินค้า
+         * @param {string} url - URL ของ Lazada
+         * @returns {string} รหัสสินค้า (product ID)
+         */
+        function extractLazadaProductId(url) {
+            try {
+                // สร้าง URL object
+                const urlObj = new URL(url);
+                
+                // ดึง pathname จาก URL
+                const pathname = urlObj.pathname;
+                
+                // ใช้ regex เพื่อหา pattern ของ product ID
+                // รูปแบบ: /products/ชื่อสินค้า-i{productId}-s{skuId}.html
+                const productIdMatch = pathname.match(/i(\d+)/);
+                
+                if (productIdMatch) {
+                    return productIdMatch[1]; // ส่งคืนเฉพาะตัวเลขของ product ID
+                }
+                
+                // ถ้าไม่เจอในรูปแบบแรก ลองหาในรูปแบบอื่น
+                // รูปแบบ: /i{productId}.html
+                const simpleMatch = pathname.match(/\/i(\d+)\.html/);
+                if (simpleMatch) {
+                    return simpleMatch[1];
+                }
+                
+                throw new Error('ไม่พบรหัสสินค้าใน URL');
+                
+            } catch (error) {
+                console.error('เกิดข้อผิดพลาดในการแยก URL:', error.message);
+                return null;
+            }
+        }
+
+        /**
+         * ฟังก์ชันสำหรับสร้าง URL ใหม่จากรหัสสินค้า
+         * @param {string} productId - รหัสสินค้า
+         * @returns {string} URL ใหม่
+         */
+        function createLazadaUrl(productId) {
+            return `https://www.lazada.co.th/i${productId}.html`;
+        }
+
+        /**
+         * ฟังก์ชันหลักสำหรับแปลง URL
+         * @param {string} originalUrl - URL เดิมของ Lazada
+         * @returns {string} URL ใหม่ที่มีเฉพาะรหัสสินค้า
+         */
+        function convertLazadaUrl(originalUrl) {
+            const productId = extractLazadaProductId(originalUrl);
+            if (productId) {
+                return createLazadaUrl(productId);
+            }
+            return null;
+        }
+
+
+
+        /**
+         * ฟังก์ชันสำหรับแสดงข้อผิดพลาด
+         */
+        function showError(message) {
+            const resultDiv = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultContent.innerHTML = `<div class="error">${message}</div>`;
+            resultDiv.style.display = 'block';
+        }
+
+        /**
+         * ฟังก์ชันสำหรับย่อลิงก์ Lazada โดยใช้ API
+         * @param {string} lazadaUrl - URL ของ Lazada ที่ต้องการย่อ
+         * @returns {Promise<Object>} ผลลัพธ์การย่อลิงก์
+         */
+        async function shortenLazadaUrl(lazadaUrl) {
+            try {
+                const apiUrl = `https://getlink-lazada.lslly.com/api/v1?link=${encodeURIComponent(lazadaUrl)}`;
+                
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                return {
+                    success: data.success,
+                    shortenedUrl: data.data?.message || null,
+                    originalUrl: data.originalUrl || lazadaUrl,
+                    timestamp: data.timestamp,
+                    resultCode: data.data?.resultCode,
+                    error: null
+                };
+                
+            } catch (error) {
+                return {
+                    success: false,
+                    shortenedUrl: null,
+                    originalUrl: lazadaUrl,
+                    timestamp: new Date().toISOString(),
+                    resultCode: null,
+                    error: error.message
+                };
+            }
+        }
+
+        /**
+         * ฟังก์ชันสำหรับประมวลผล URL แบบครบวงจร (ตัดคำ + ย่อลิงก์)
+         * @param {string} originalUrl - URL เดิมของ Lazada
+         * @returns {Promise<Object>} ผลลัพธ์การประมวลผล
+         */
+        async function processLazadaUrl(originalUrl) {
+            try {
+                // ขั้นตอนที่ 1: ตัดคำ URL เพื่อดึงรหัสสินค้า
+                const productId = extractLazadaProductId(originalUrl);
+                const cleanUrl = productId ? createLazadaUrl(productId) : null;
+                
+                // ขั้นตอนที่ 2: ย่อลิงก์ (ถ้ามี clean URL)
+                let shortenedResult = null;
+                if (cleanUrl) {
+                    shortenedResult = await shortenLazadaUrl(cleanUrl);
+                }
+                
+                return {
+                    success: true,
+                    originalUrl: originalUrl,
+                    productId: productId,
+                    cleanUrl: cleanUrl,
+                    shortenedUrl: shortenedResult?.shortenedUrl || null,
+                    timestamp: new Date().toISOString(),
+                    error: null
+                };
+                
+            } catch (error) {
+                return {
+                    success: false,
+                    originalUrl: originalUrl,
+                    productId: null,
+                    cleanUrl: null,
+                    shortenedUrl: null,
+                    timestamp: new Date().toISOString(),
+                    error: error.message
+                };
+            }
+        }
+
+        /**
+         * ฟังก์ชันสำหรับย่อลิงก์
+         */
+        async function shortenUrl() {
+            const urlInput = document.getElementById('lazadaUrl').value.trim();
+            const resultDiv = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            
+            if (!urlInput) {
+                showError('กรุณาใส่ URL ของ Lazada');
+                return;
+            }
+            
+            // แสดงสถานะกำลังโหลด
+            resultContent.innerHTML = '<div style="text-align: center; color: #666;">⏳ กำลังย่อลิงก์...</div>';
+            resultDiv.style.display = 'block';
+            
+            try {
+                // ขั้นตอนที่ 1: ตัดคำ URL เพื่อดึงรหัสสินค้า
+                const productId = extractLazadaProductId(urlInput);
+                const cleanUrl = productId ? createLazadaUrl(productId) : null;
+                
+                // ขั้นตอนที่ 2: ย่อลิงก์
+                const result = await shortenLazadaUrl(cleanUrl || urlInput);
+                
+                if (result.success && result.shortenedUrl) {
+                    resultContent.innerHTML = `
+                        <p><strong>✅ ย่อลิงก์สำเร็จ!</strong></p>
+                        
+                        <p><strong>🔗 ลิงก์เดิม:</strong></p>
+                        <div class="new-url">
+                            <a href="${urlInput}" target="_blank" style="color: #333; text-decoration: none;">
+                                ${urlInput}
+                            </a>
+                        </div>
+                        
+                        <p><strong>✂️ ลิงก์ที่ตัดแล้ว:</strong></p>
+                        <div class="new-url" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                            ${cleanUrl ? 
+                                `<a href="${cleanUrl}" target="_blank" style="color: #856404; text-decoration: none;">${cleanUrl}</a>` : 
+                                '<span style="color: #856404;">ไม่สามารถตัดคำได้</span>'
+                            }
+                        </div>
+                        
+                        <p><strong>🔗 ลิงก์ที่ย่อแล้ว:</strong></p>
+                        <div class="new-url" style="background-color: #d4edda; border-left: 4px solid #28a745;">
+                            <a href="${result.shortenedUrl}" target="_blank" style="color: #155724; text-decoration: none;">
+                                ${result.shortenedUrl}
+                            </a>
+                        </div>
+                    `;
+                } else {
+                    showError(`ไม่สามารถย่อลิงก์ได้: ${result.error || 'ไม่ทราบสาเหตุ'}`);
+                }
+            } catch (error) {
+                showError('เกิดข้อผิดพลาด: ' + error.message);
+            }
+        }
+
+
+
+        /**
+         * ฟังก์ชันสำหรับล้างผลลัพธ์
+         */
+        function clearResults() {
+            document.getElementById('lazadaUrl').value = '';
+            document.getElementById('result').style.display = 'none';
+        }
+
+        // เพิ่ม event listener สำหรับการกด Enter
+        document.getElementById('lazadaUrl').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                shortenUrl();
+            }
+        });
+    </script>
+</body>
+</html> 
